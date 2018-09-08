@@ -23,3 +23,5 @@ erl_crash.dump
 proj1-*.tar
 
 Proj1.pdf
+.elixir_ls/
+.vscode/

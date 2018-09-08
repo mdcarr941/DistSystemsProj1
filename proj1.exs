@@ -7,9 +7,4 @@ end
 {limit, _} = limit
 {k, _} = k
 
-Proj1.run(limit, k)
-# Enum.each(Proj1.make_blocks(limit, div(limit, 16)), fn(block) ->
-#     with {block_start, block_limit} <- block,
-#     do: IO.puts("start = #{block_start}, end = #{block_limit}")
-# end)
-#Proj1.work(k, {7, 76})
+Proj1.run(limit, k) |> Enum.each(&(IO.puts(&1)))

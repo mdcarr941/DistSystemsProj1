@@ -1,7 +1,13 @@
 defmodule Proj1 do
+  use GenServer
   @moduledoc """
-  
+  This module contains code which solves the following problem:
+  Find all numbers b <= N such that \sum_{i=0}^{k-1} (b + i) is a square.
+  To use this module simply call Proj1.run(N, k) and a list of solutions
+  will be returned.
   """
+
+  ### Server functions (used by workers).
 
   @doc """
   Get the next {status, sq_sum, list} tuple.
@@ -20,15 +26,19 @@ defmodule Proj1 do
     end
   end
 
-  def check(limit, tup, epsilon \\ 1.0e-32) do
-    {status, sq_sum, list} = tup
+  def check(limit, {status, sq_sum, list}, epsilon \\ 1.0e-32) do
     if status != :halt do
       root = :math.sqrt(sq_sum)
-      if root - trunc(root) < epsilon do
-        {first, _} = hd list
-        IO.puts(first)
-      end
-      check(limit, next(sq_sum, list, limit), epsilon)
+      output =
+        if root - trunc(root) < epsilon do
+          {first, _} = hd list
+          [first]
+        else
+          []
+        end
+      output ++ check(limit, next(sq_sum, list, limit), epsilon)
+    else
+      []
     end
   end
 
@@ -50,14 +60,13 @@ defmodule Proj1 do
     }
   end
 
-  def work(k, block) do
-    {start, limit} = block
+  def work(k, {start, limit}) do
     check(limit, begin(k, start))
   end
 
   def make_blocks(limit, block_size, blocks \\ [])
   when is_number(limit) and is_number(block_size) do
-    block_size = max(block_size, 1)
+    block_size = max(block_size, 1) # prevent block_size < 1
     blocks =
       if length(blocks) > 0 do
         blocks
@@ -74,27 +83,36 @@ defmodule Proj1 do
     end
   end
 
-  def num_workers do
-    16
+  def init({callback_pid, k}) do
+    {:ok, {callback_pid, k, []}}
   end
 
-  def run(limit, k, num_workers \\ num_workers()) do
-    make_blocks(limit, div(limit, num_workers))
-      |> Enum.map( &(Task.async(Proj1, :work, [k, &1])) )
-      |> Enum.each( &(Task.await(&1)) )
+  def handle_cast({:start, block_start, block_limit}, {callback_pid, k, task_pids}) do
+    task_pid = Task.async(Proj1, :work, [k, {block_start, block_limit}])
+    task_pids = [task_pid] ++ task_pids
+    {:noreply, {callback_pid, k, task_pids}}
   end
-end
 
-defmodule Proj1.Utility do
-  @moduledoc """
-  Utility functions for Proj1.
-  """
+  def handle_call(:yield, _from, {callback_pid, k, task_pids}) do
+    solutions = Enum.map(task_pids, &(Task.yield(&1, :infinity)))
+      |> Enum.map(fn({_, task_output}) -> task_output end)
+      |> Enum.reduce(&(&1 ++ &2))
+    {:reply, solutions, {callback_pid, k, []}}
+  end
 
-  @doc """
-  Verify that the sum of the squares of the integers from n to n + k - 1 is a square.
-  """
-  def verify(n, k, epsilon \\ 1.0e-32) do
-    root = :math.sqrt(Enum.reduce(Enum.map(Proj1.consecutive(k, [n]), &(&1 * &1)), &(&1 + &2)))
-    root - trunc(root) < epsilon
+  ### Client functions (used by supervisor).
+
+  def start({block_start, block_limit}) do
+    GenServer.cast(__MODULE__, {:start, block_start, block_limit})
+  end
+
+  def yield() do
+    GenServer.call(__MODULE__, :yield, :infinity)
+  end
+
+  def run(limit, k, num_workers \\ 16) do
+    {:ok, _} = GenServer.start_link(__MODULE__, {self(), k}, name: __MODULE__)
+    make_blocks(limit, div(limit, num_workers)) |> Enum.map( &(Proj1.start(&1)) )
+    yield()
   end
 end
