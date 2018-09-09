@@ -3,15 +3,18 @@ defmodule Proj1 do
   @moduledoc """
   This module contains code which solves the following problem:
   Find all numbers b <= N such that \sum_{i=0}^{k-1} (b + i) is a square.
-  To use this module simply call Proj1.run(N, k) and a list of solutions
-  will be returned.
+  To use this module from the command line call "mix run proj1.exs <N> <k>"
+  from the project directory. If you wish to call this module from elixir you
+  can invoke Proj1.run(N, k, num_workers \\ 16).
   """
 
   ### Server functions (used by workers).
 
   @doc """
-  Get the next {status, sq_sum, list} tuple.
+  Get the next {status, sq_sum, list} tuple but return :halt when the first
+  entry in list is greater than or equal to limit.
   """
+  @spec next(integer, [{integer, integer}], integer) :: {:halt | :ok, integer, [{integer, integer}]}
   def next(sq_sum, list, limit) do
     [{first, first_sq} | tail] = list
     if first >= limit do
@@ -26,6 +29,11 @@ defmodule Proj1 do
     end
   end
 
+  @doc """
+  Recursively check if sq_sum is a perfect square until next returns :halt. Returns a list
+  of solutions found.
+  """
+  @spec check(integer, {atom, integer, [{integer, integer}]}, number) :: [integer]
   def check(limit, {status, sq_sum, list}, epsilon \\ 1.0e-32) do
     if status != :halt do
       root = :math.sqrt(sq_sum)
@@ -42,6 +50,10 @@ defmodule Proj1 do
     end
   end
 
+  @doc """
+  Create a list of consecutive integers of length k starting at the last entry in list.
+  """
+  @spec consecutive(integer, [integer]) :: [integer]
   def consecutive(k, list \\ [1]) do
     if length(list) >= k do
       list
@@ -50,6 +62,10 @@ defmodule Proj1 do
     end
   end
 
+  @doc """
+  Create a {status, sq_sum, list} tuple to be used as the base case for the next function.
+  """
+  @spec begin(integer, integer) :: {:ok, number, [{integer, integer}]}
   def begin(k, start \\ 1) do
     list = consecutive(k, [start])
     squares = Enum.map(list, &(&1 * &1))
@@ -60,12 +76,21 @@ defmodule Proj1 do
     }
   end
 
+  @doc """
+  Solve the problem of length k where the starting number b is such that start <= b <= limit.
+  """
+  @spec work(integer, {integer, integer}) :: [integer]
   def work(k, {start, limit}) do
     check(limit, begin(k, start))
   end
 
-  def make_blocks(limit, block_size, blocks \\ [])
-  when is_number(limit) and is_number(block_size) do
+  @doc """
+  Split up the integers {1, ..., limit} into disjoint blocks {block_start, ..., block_limit} such that
+  block_limit - block_start + 1 <= block_size, where we have equality for all but perhaps
+  the last entry.
+  """
+  @spec make_blocks(integer, integer, [{integer, integer}]) :: [{integer, integer}]
+  def make_blocks(limit, block_size, blocks \\ []) do
     block_size = max(block_size, 1) # prevent block_size < 1
     blocks =
       if length(blocks) > 0 do
@@ -83,35 +108,61 @@ defmodule Proj1 do
     end
   end
 
-  def init({callback_pid, k}) do
-    {:ok, {callback_pid, k, []}}
+  @doc """
+  Initialize this GenServer with parameter k.
+  """
+  @spec init(integer) :: {:ok, {integer, [integer]}}
+  def init(k) do
+    {:ok, {k, []}}
   end
 
-  def handle_cast({:start, block_start, block_limit}, {callback_pid, k, task_pids}) do
+  @doc """
+  Start a worker as an async task for the block {block_start, block_limit}. The workers
+  pid is added to the task_pids list in the state.
+  """
+  @spec handle_cast({:start, integer, integer}, {integer, [integer]}) :: {:noreply, {integer, [integer]}}
+  def handle_cast({:start, block_start, block_limit}, {k, task_pids}) do
     task_pid = Task.async(Proj1, :work, [k, {block_start, block_limit}])
     task_pids = [task_pid] ++ task_pids
-    {:noreply, {callback_pid, k, task_pids}}
+    {:noreply, {k, task_pids}}
   end
 
-  def handle_call(:yield, _from, {callback_pid, k, task_pids}) do
+  @doc """
+  Wait for all the running workers to finish then return the concatenation of their output.
+  """
+  @spec handle_call(:yield, {pid, term}, {integer, [integer]}) :: {:reply, [integer], {integer, [integer]}}
+  def handle_call(:yield, _from, {k, task_pids}) do
     solutions = Enum.map(task_pids, &(Task.yield(&1, :infinity)))
       |> Enum.map(fn({_, task_output}) -> task_output end)
       |> Enum.reduce(&(&1 ++ &2))
-    {:reply, solutions, {callback_pid, k, []}}
+    {:reply, solutions, {k, []}}
   end
 
-  ### Client functions (used by supervisor).
+  ### Client functions.
 
+  @doc """
+  Tell the GenServer to start a worker to work from block_start to block_limit.
+  """
+  @spec start({integer, integer}) :: :ok
   def start({block_start, block_limit}) do
     GenServer.cast(__MODULE__, {:start, block_start, block_limit})
   end
 
+  @doc """
+  Get the output of all the workers from the GenServer.
+  """
+  @spec yield() :: [integer]
   def yield() do
     GenServer.call(__MODULE__, :yield, :infinity)
   end
 
+  @doc """
+  Split the problem with N = limit and k = k into num_workers blocks and solve
+  each one concurrently.
+  """
+  @spec run(integer, integer, integer) :: [integer]
   def run(limit, k, num_workers \\ 16) do
-    {:ok, _} = GenServer.start_link(__MODULE__, {self(), k}, name: __MODULE__)
+    {:ok, _} = GenServer.start_link(__MODULE__, k, name: __MODULE__)
     make_blocks(limit, div(limit, num_workers)) |> Enum.map( &(Proj1.start(&1)) )
     yield()
   end

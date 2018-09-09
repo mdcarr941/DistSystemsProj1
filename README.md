@@ -1,21 +1,15 @@
-# Proj1
+# Group Info
 
-**TODO: Add description**
+ - Matthew Carr 9129-9208
 
-## Installation
+# Instructions
+Invoke the solver from the command line by calling
+`mix run proj1.exs N k`
+from the project's directory, where N and k are non-negative integers
+whose semantics are described in the problem statement.
 
-If [available in Hex](https://hex.pm/docs/publish), the package can be installed
-by adding `proj1` to your list of dependencies in `mix.exs`:
+You may also invoke the solver from elixir by calling
+`Proj1.run(N, k)`
 
-```elixir
-def deps do
-  [
-    {:proj1, "~> 0.1.0"}
-  ]
-end
-```
-
-Documentation can be generated with [ExDoc](https://github.com/elixir-lang/ex_doc)
-and published on [HexDocs](https://hexdocs.pm). Once published, the docs can
-be found at [https://hexdocs.pm/proj1](https://hexdocs.pm/proj1).
-
+There is a suite of tests included with the project which you can run with
+`mix test` from the project's directory.
