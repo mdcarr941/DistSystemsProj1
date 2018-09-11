@@ -44,4 +44,8 @@ defmodule Proj1Test do
   test "test run with N = 20 and k = 24" do
     Proj1.run(20, 24) |> Enum.each(&(verify(&1, 24)))
   end
+
+  test "test run with N = 10000000 and k = 4" do
+    assert length(Proj1.run(10000000, 4)) == 0
+  end
 end

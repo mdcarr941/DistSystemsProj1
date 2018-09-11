@@ -5,7 +5,7 @@ defmodule Proj1 do
   Find all numbers b <= N such that \sum_{i=0}^{k-1} (b + i) is a square.
   To use this module from the command line call "mix run proj1.exs <N> <k>"
   from the project directory. If you wish to call this module from elixir you
-  can invoke Proj1.run(N, k, num_workers \\ 16).
+  can invoke Proj1.run(N, k).
   """
 
   ### Server functions (used by workers).
@@ -161,7 +161,7 @@ defmodule Proj1 do
   each one concurrently.
   """
   @spec run(integer, integer, integer) :: [integer]
-  def run(limit, k, num_workers \\ 16) do
+  def run(limit, k, num_workers \\ 8) do
     {:ok, _} = GenServer.start_link(__MODULE__, k, name: __MODULE__)
     make_blocks(limit, div(limit, num_workers)) |> Enum.map( &(Proj1.start(&1)) )
     yield()
