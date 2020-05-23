@@ -1,3 +1,9 @@
+# Description
+This project contains code to find all integers b <= N such that the sum of b to b + k - 1
+is a perfect square (where k is given). Rather than doing a simple brute-force search the code
+in this project divides the numbers to be searched between workers and conducts the search in
+parallel.
+ 
 # Instructions
 Invoke the solver from the command line by calling
 `mix run proj1.exs N k`
