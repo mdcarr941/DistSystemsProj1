@@ -1,7 +1,3 @@
-# Group Info
-
- - Matthew Carr 9129-9208
-
 # Instructions
 Invoke the solver from the command line by calling
 `mix run proj1.exs N k`
